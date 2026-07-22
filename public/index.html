@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Downloader - YouTube, Facebook, Instagram, TikTok, X</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-top">
+                <h1>Video Downloader</h1>
+                <button id="darkModeToggle" class="dark-mode-btn" title="Toggle Dark Mode">🌙</button>
+            </div>
+            <p class="subtitle">Download videos from your favorite platforms</p>
+        </header>
+
+        <main>
+            <div class="platform-selector">
+                <button class="platform-btn active" data-platform="facebook">
+                    <span class="icon">📘</span> Facebook
+                </button>
+                <button class="platform-btn" data-platform="instagram">
+                    <span class="icon">📷</span> Instagram
+                </button>
+                <button class="platform-btn" data-platform="tiktok">
+                    <span class="icon">🎵</span> TikTok
+                </button>
+                <button class="platform-btn" data-platform="youtube">
+                    <span class="icon">▶️</span> YouTube
+                </button>
+                <button class="platform-btn" data-platform="x">
+                    <span class="icon">✖</span> X (Twitter)
+                </button>
+            </div>
+
+            <div class="download-form">
+                <div class="input-wrapper">
+                    <input type="text" id="videoUrl" placeholder="Paste video URL here..." />
+                    <button id="pasteBtn" class="paste-btn" title="Paste from clipboard">📋</button>
+                </div>
+                <button id="downloadBtn" class="download-btn">Download</button>
+            </div>
+
+            <div id="videoInfo" class="video-info hidden">
+                <img id="thumbnail" src="" alt="Video thumbnail" />
+                <div class="info-details">
+                    <h3 id="videoTitle"></h3>
+                    <p id="videoMeta"></p>
+                </div>
+                <div id="qualitySelector" class="quality-selector hidden">
+                    <label for="qualitySelect">Video Quality:</label>
+                    <select id="qualitySelect">
+                        <option value="">Best Available</option>
+                    </select>
+                </div>
+                <div class="download-options">
+                    <button id="downloadVideo" class="option-btn">Download Video (MP4)</button>
+                    <button id="downloadAudio" class="option-btn">Download Audio (MP3)</button>
+                </div>
+            </div>
+
+            <div id="status" class="status hidden"></div>
+
+            <div class="instructions">
+                <h3>How to use:</h3>
+                <ol>
+                    <li>Select the platform from above</li>
+                    <li>Copy the video URL from the platform</li>
+                    <li>Paste the URL in the input field (or click 📋 to paste)</li>
+                    <li>Click Download to fetch video info</li>
+                    <li>Choose quality (optional) and download as video or audio</li>
+                </ol>
+            </div>
+
+            <div class="disclaimer">
+                <p><strong>Disclaimer:</strong> This tool is for personal use only. Please respect copyright laws and the terms of service of each platform. Only download content you have permission to download.</p>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 Video Downloader. By Deaconsholy For educational purposes only.</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
