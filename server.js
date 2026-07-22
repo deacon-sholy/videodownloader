@@ -19,7 +19,7 @@ if (!fs.existsSync(downloadsDir)) {
 // Deno path for yt-dlp JS runtime support (required for YouTube extraction)
 const DENO_PATH = process.platform === 'win32'
     ? path.join(process.env.USERPROFILE || 'C:\\Users\\dell', '.deno', 'bin', 'deno.exe')
-    : '/usr/bin/deno';
+    : '/root/.deno/bin/deno';
 
 function runYtDlp(args) {
     return new Promise((resolve, reject) => {
