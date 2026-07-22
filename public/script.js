@@ -1,4 +1,47 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // ==================== PERFORMANCE: Lazy load images with Intersection Observer ====================
+    if ('IntersectionObserver' in window) {
+        const imgObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    if (img.dataset.src) {
+                        img.src = img.dataset.src;
+                        img.removeAttribute('data-src');
+                    }
+                    imgObserver.unobserve(img);
+                }
+            });
+        }, { rootMargin: '200px' });
+        window.__imgObserver = imgObserver;
+    }
+
+    // ==================== PERFORMANCE: AbortController for request cancellation ====================
+    let activeRequests = [];
+    let currentController = null;
+
+    function abortAllRequests() {
+        activeRequests.forEach(controller => controller.abort());
+        activeRequests = [];
+        currentController = null;
+    }
+
+    function createAbortSignal(timeout = 30000) {
+        const controller = new AbortController();
+        currentController = controller;
+        activeRequests.push(controller);
+        setTimeout(() => controller.abort(), timeout);
+        return controller.signal;
+    }
+
+    function cleanupRequest() {
+        if (currentController) {
+            const idx = activeRequests.indexOf(currentController);
+            if (idx > -1) activeRequests.splice(idx, 1);
+            currentController = null;
+        }
+    }
+
     const platformBtns = document.querySelectorAll('.platform-btn');
     const videoUrlInput = document.getElementById('videoUrl');
     const pasteBtn = document.getElementById('pasteBtn');
@@ -97,16 +140,21 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        // Abort any previous pending requests
+        abortAllRequests();
+
         showStatus('Fetching video info...', 'loading');
         qualitySelector.classList.add('hidden');
         
         try {
+            const signal = createAbortSignal(30000); // 30s timeout for info fetch
             const response = await fetch('/api/info', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ url })
+                body: JSON.stringify({ url }),
+                signal
             });
 
             const data = await response.json();
@@ -116,7 +164,16 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             currentVideoUrl = url;
-            thumbnail.src = data.thumbnail;
+            
+            // Lazy load thumbnail via Intersection Observer
+            if (window.__imgObserver) {
+                thumbnail.dataset.src = data.thumbnail;
+                thumbnail.src = ''; // Clear src, observer will set it
+                window.__imgObserver.observe(thumbnail);
+            } else {
+                thumbnail.src = data.thumbnail;
+            }
+            
             videoTitle.textContent = data.title;
             videoMeta.textContent = `${data.platform} • ${data.uploader} • ${formatDuration(data.duration)}`;
             
@@ -126,20 +183,28 @@ document.addEventListener('DOMContentLoaded', function() {
             // Fetch available qualities for video platforms
             fetchQualityOptions(url);
         } catch (error) {
-            showStatus(error.message, 'error');
+            if (error.name === 'AbortError') {
+                showStatus('Request timed out. Please try again.', 'error');
+            } else {
+                showStatus(error.message, 'error');
+            }
             videoInfo.classList.add('hidden');
+        } finally {
+            cleanupRequest();
         }
     });
 
     // ==================== QUALITY SELECTION ====================
     async function fetchQualityOptions(url) {
         try {
+            const signal = createAbortSignal(15000); // 15s timeout for format options
             const response = await fetch('/api/formats', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ url })
+                body: JSON.stringify({ url }),
+                signal
             });
 
             if (!response.ok) return;
@@ -188,6 +253,9 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        // Abort any previous pending requests
+        abortAllRequests();
+
         showStatus('Starting download...', 'loading');
 
         try {
@@ -198,12 +266,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 body.quality = qualitySelect.value;
             }
 
+            const signal = createAbortSignal(600000); // 10 min timeout for download
             const response = await fetch('/api/download', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
+                signal
             });
 
             if (!response.ok) {
@@ -231,9 +301,16 @@ document.addEventListener('DOMContentLoaded', function() {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
 
-            showStatus('Download completed!', 'success');
+            showStatus('Download completed! Refreshing...', 'success');
+            setTimeout(() => location.reload(), 2000);
         } catch (error) {
-            showStatus(error.message, 'error');
+            if (error.name === 'AbortError') {
+                showStatus('Download timed out. The video may be too large.', 'error');
+            } else {
+                showStatus(error.message, 'error');
+            }
+        } finally {
+            cleanupRequest();
         }
     }
 
