@@ -18,7 +18,9 @@ if (!fs.existsSync(downloadsDir)) {
 
 function runYtDlp(args) {
     return new Promise((resolve, reject) => {
-        const ytdlp = spawn('python', ['-m', 'yt_dlp', ...args]);
+        // Use python3 on Linux (Render), python on Windows
+        const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+        const ytdlp = spawn(pythonCmd, ['-m', 'yt_dlp', ...args]);
         let stdout = '';
         let stderr = '';
 
