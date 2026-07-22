@@ -16,11 +16,31 @@ if (!fs.existsSync(downloadsDir)) {
     fs.mkdirSync(downloadsDir);
 }
 
+// Deno path for yt-dlp JS runtime support (required for YouTube extraction)
+const DENO_PATH = process.platform === 'win32'
+    ? path.join(process.env.USERPROFILE || 'C:\\Users\\dell', '.deno', 'bin', 'deno.exe')
+    : '/usr/bin/deno';
+
 function runYtDlp(args) {
     return new Promise((resolve, reject) => {
         // Use python3 on Linux (Render), python on Windows
         const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-        const ytdlp = spawn(pythonCmd, ['-m', 'yt_dlp', ...args]);
+        
+        // Add JS runtime flag for YouTube extraction and Android client to bypass bot detection
+        const ytArgs = [
+            '--js-runtimes', 'deno',
+            '--extractor-args', 'youtube:player_client=android',
+            ...args
+        ];
+        
+        const env = { ...process.env };
+        // Ensure Deno is on PATH for yt-dlp
+        if (process.platform === 'win32') {
+            const denoDir = path.dirname(DENO_PATH);
+            env.PATH = `${denoDir};${env.PATH}`;
+        }
+        
+        const ytdlp = spawn(pythonCmd, ['-m', 'yt_dlp', ...ytArgs], { env });
         let stdout = '';
         let stderr = '';
 
