@@ -298,36 +298,46 @@ app.post('/api/download', async (req, res) => {
         
         if (downloadedFile) {
             const filePath = path.join(downloadsDir, downloadedFile);
-            const stat = fs.statSync(filePath);
             
-            // Ensure the filename ends with .mp4 for video downloads
-            let safeFilename = downloadedFile;
-            if (format !== 'audio' && !safeFilename.toLowerCase().endsWith('.mp4')) {
-                safeFilename = safeFilename.replace(/\.[^.]+$/, '.mp4');
-            }
-            
-            // Sanitize filename: remove characters invalid in HTTP headers
-            safeFilename = safeFilename
-                .replace(/[^\x20-\x7E]/g, '')  // strip non-printable / non-ASCII
-                .replace(/"/g, "'")             // replace double quotes
-                .replace(/\\/g, '')             // strip backslashes
-                .replace(/[\r\n]/g, '')         // strip newlines
+            // Build a clean display filename from the original title
+            let displayName = downloadedFile.replace(downloadId + '-', '').replace(/\.[^.]+$/, '');
+            displayName = displayName
+                .replace(/[^\x20-\x7E]/g, '')
+                .replace(/"/g, "'")
+                .replace(/\\/g, '')
+                .replace(/[\r\n]/g, '')
+                .replace(/\s+/g, ' ')
                 .trim();
             
-            // Fallback if stripping left nothing useful
-            if (!safeFilename || safeFilename.length < 4) {
-                safeFilename = format === 'audio' ? 'audio.mp3' : 'video.mp4';
+            const ext = format === 'audio' ? 'mp3' : 'mp4';
+            const safeFilename = displayName.length > 2 ? `${displayName}.${ext}` : `video.${ext}`;
+            
+            // Rename file to guaranteed correct extension before streaming
+            const destPath = path.join(downloadsDir, `${downloadId}.${ext}`);
+            if (filePath !== destPath) {
+                fs.renameSync(filePath, destPath);
             }
+            
+            const stat = fs.statSync(destPath);
             
             res.setHeader('Content-Length', stat.size);
             res.setHeader('Content-Type', format === 'audio' ? 'audio/mpeg' : 'video/mp4');
             res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
             
-            const readStream = fs.createReadStream(filePath);
+            const readStream = fs.createReadStream(destPath);
             readStream.pipe(res);
             
-            readStream.on('end', () => { try { fs.unlinkSync(filePath); } catch(e) {} });
-            readStream.on('error', () => { try { fs.unlinkSync(filePath); } catch(e) {} });
+            readStream.on('end', () => { try { fs.unlinkSync(destPath); } catch(e) {} });
+            readStream.on('error', () => { try { fs.unlinkSync(destPath); } catch(e) {} });
+            
+            // Also clean up any leftover intermediate files (e.g. .ts, .m4a from merge)
+            try {
+                for (const f of filesAfter) {
+                    if (f.startsWith(downloadId) && f !== downloadedFile && !filesBefore.has(f)) {
+                        fs.unlinkSync(path.join(downloadsDir, f));
+                    }
+                }
+            } catch(e) {}
         } else {
             res.status(500).json({ error: 'Download failed' });
         }
