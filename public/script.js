@@ -19,22 +19,25 @@ document.addEventListener('DOMContentLoaded', function() {
     // ==================== PERFORMANCE: AbortController for request cancellation ====================
     let activeRequests = [];
     let currentController = null;
+    let currentTimeoutId = null;
 
     function abortAllRequests() {
         activeRequests.forEach(controller => controller.abort());
         activeRequests = [];
         currentController = null;
+        if (currentTimeoutId) { clearTimeout(currentTimeoutId); currentTimeoutId = null; }
     }
 
     function createAbortSignal(timeout = 30000) {
         const controller = new AbortController();
         currentController = controller;
         activeRequests.push(controller);
-        setTimeout(() => controller.abort(), timeout);
+        currentTimeoutId = setTimeout(() => controller.abort(), timeout);
         return controller.signal;
     }
 
     function cleanupRequest() {
+        if (currentTimeoutId) { clearTimeout(currentTimeoutId); currentTimeoutId = null; }
         if (currentController) {
             const idx = activeRequests.indexOf(currentController);
             if (idx > -1) activeRequests.splice(idx, 1);
@@ -82,11 +85,6 @@ document.addEventListener('DOMContentLoaded', function() {
         applyDarkMode(isDark);
         localStorage.setItem('darkMode', isDark);
     });
-
-    // Apply dark mode to body on load (matches CSS)
-    if (savedDarkMode) {
-        document.body.classList.add('dark-mode');
-    }
 
     // ==================== PLATFORM SELECTOR ====================
     platformBtns.forEach(btn => {
@@ -286,9 +284,9 @@ document.addEventListener('DOMContentLoaded', function() {
             let filename = format === 'video' ? 'video.mp4' : 'audio.mp3';
             
             if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename=(.+)/);
+                const filenameMatch = contentDisposition.match(/filename="?([^";\s]+)"?/);
                 if (filenameMatch) {
-                    filename = filenameMatch[1].replace(/"/g, '');
+                    filename = filenameMatch[1];
                 }
             }
             
@@ -299,17 +297,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 filename = filename.replace(/\.[^.]+$/, '.mp3');
             }
 
-            const url = window.URL.createObjectURL(blob);
+            const blobUrl = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
+            a.href = blobUrl;
             a.download = filename;
             document.body.appendChild(a);
             a.click();
-            window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
 
-            showStatus('Download completed! Refreshing...', 'success');
-            setTimeout(() => location.reload(), 2000);
+            showStatus('Download completed!', 'success');
+            // Delay revoke to ensure browser has started saving
+            setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10000);
         } catch (error) {
             if (error.name === 'AbortError') {
                 showStatus('Download timed out. The video may be too large.', 'error');

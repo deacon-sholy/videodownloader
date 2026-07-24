@@ -4,6 +4,7 @@ const compression = require('compression');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -140,7 +141,8 @@ function runYtDlp(args, isYouTube = false) {
         // Timeout: 3 min for info requests, 15 min for downloads
         const timeout = args.includes('--dump-json') ? 180000 : 900000;
         const timeoutId = setTimeout(() => {
-            ytdlp.kill('SIGKILL');
+            ytdlp.kill('SIGTERM');
+            setTimeout(() => { try { ytdlp.kill('SIGKILL'); } catch(e) {} }, 3000);
             reject(new Error('Request timed out'));
         }, timeout);
 
@@ -167,8 +169,6 @@ app.post('/api/info', async (req, res) => {
             '--dump-json',
             '--no-download',
             '--no-warnings',
-            '--skip-download',
-            '--flat-playlist',
             url
         ];
 
@@ -202,8 +202,6 @@ app.post('/api/formats', async (req, res) => {
             '--dump-json',
             '--no-download',
             '--no-warnings',
-            '--skip-download',
-            '--flat-playlist',
             url
         ];
 
@@ -256,8 +254,11 @@ app.post('/api/download', async (req, res) => {
     const isYouTube = isYouTubeUrl(url);
 
     try {
-        const timestamp = Date.now();
-        const outputTemplate = path.join(downloadsDir, `${timestamp}-%(title)s.%(ext)s`);
+        const downloadId = crypto.randomBytes(8).toString('hex');
+        const outputTemplate = path.join(downloadsDir, `${downloadId}-%(title)s.%(ext)s`);
+        
+        // Snapshot files before download to reliably detect the new file
+        const filesBefore = new Set(fs.readdirSync(downloadsDir));
         
         let args = ['-o', outputTemplate];
         
@@ -292,8 +293,8 @@ app.post('/api/download', async (req, res) => {
 
         await runYtDlp(args, isYouTube);
 
-        const files = fs.readdirSync(downloadsDir);
-        const downloadedFile = files.find(f => f.startsWith(timestamp.toString()));
+        const filesAfter = fs.readdirSync(downloadsDir);
+        const downloadedFile = filesAfter.find(f => f.startsWith(downloadId) && !filesBefore.has(f));
         
         if (downloadedFile) {
             const filePath = path.join(downloadsDir, downloadedFile);
@@ -309,6 +310,7 @@ app.post('/api/download', async (req, res) => {
             safeFilename = safeFilename
                 .replace(/[^\x20-\x7E]/g, '')  // strip non-printable / non-ASCII
                 .replace(/"/g, "'")             // replace double quotes
+                .replace(/\\/g, '')             // strip backslashes
                 .replace(/[\r\n]/g, '')         // strip newlines
                 .trim();
             
