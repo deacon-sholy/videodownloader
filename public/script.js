@@ -288,8 +288,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (contentDisposition) {
                 const filenameMatch = contentDisposition.match(/filename=(.+)/);
                 if (filenameMatch) {
-                    filename = filenameMatch[1];
+                    filename = filenameMatch[1].replace(/"/g, '');
                 }
+            }
+            
+            // Force correct extension
+            if (format === 'video' && !filename.toLowerCase().endsWith('.mp4')) {
+                filename = filename.replace(/\.[^.]+$/, '.mp4');
+            } else if (format === 'audio' && !filename.toLowerCase().endsWith('.mp3')) {
+                filename = filename.replace(/\.[^.]+$/, '.mp3');
             }
 
             const url = window.URL.createObjectURL(blob);

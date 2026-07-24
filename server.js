@@ -60,13 +60,14 @@ function runYtDlp(args, isYouTube = false) {
     return new Promise((resolve, reject) => {
         const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
         
-        // Base performance flags
+        // Base performance flags — optimized for speed
         const ytArgs = [
-            '--concurrent-fragments', '5',
+            '--concurrent-fragments', '10',
             '--compat-options', 'no-live-chat',
             '--no-overwrites',
             '--no-part',
-            '--buffer-size', '16K',
+            '--buffer-size', '64K',
+            '--socket-timeout', '30',
         ];
 
         // YouTube-specific flags to bypass bot detection
@@ -75,20 +76,23 @@ function runYtDlp(args, isYouTube = false) {
             ytArgs.push(
                 '--extractor-args', [
                     'youtube:player_client=android,android_creator,android_music,ios,web',
-                    'youtube:skip=webpage:downloads',  // Skip slow webpage parsing
-                    'youtube:player_skip=webpage,configs',  // Skip unnecessary configs
+                    'youtube:skip=webpage:downloads',
+                    'youtube:player_skip=webpage,configs',
                 ].join(';'),
                 '--js-runtimes', 'deno',
                 '--extractor-retries', '3',
-                '--fragment-retries', '5',
-                '--retry-sleep-fragment', '2',
-                '--retry-sleep', 'extractor=3',
-                '--sleep-requests', '0.5',         // Small delay between requests to avoid rate limiting
+                '--fragment-retries', '10',
+                '--retry-sleep-fragment', '1',
+                '--retry-sleep', 'extractor=2',
+                '--sleep-requests', '0.3',
                 '--no-abort-on-error',
                 '--geo-bypass',
             );
         } else {
-            ytArgs.push('--extractor-retries', '2');
+            ytArgs.push(
+                '--extractor-retries', '3',
+                '--fragment-retries', '5',
+            );
         }
 
         ytArgs.push(...args);
@@ -263,23 +267,23 @@ app.post('/api/download', async (req, res) => {
                 args.push('-x', '--audio-format', 'mp3', '--audio-quality', '0');
                 args.push('-f', 'bestaudio[ext=m4a]/bestaudio');
             } else if (quality) {
-                args.push('-f', `${quality}+bestaudio[ext=m4a]/best`);
+                args.push('-f', `${quality}+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best`);
                 args.push('--merge-output-format', 'mp4');
             } else {
-                // YouTube: prefer well-supported formats; use avc1 (h264) for broad compatibility
-                args.push('-f', 'bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4]/best');
+                // YouTube: prefer mp4 with H.264 for broad compatibility
+                args.push('-f', 'bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best');
                 args.push('--merge-output-format', 'mp4');
             }
         } else {
-            // Non-YouTube: use standard approach
+            // Non-YouTube: force mp4 output
             if (format === 'audio') {
                 args.push('-x', '--audio-format', 'mp3', '--audio-quality', '0');
                 args.push('-f', 'bestaudio/best');
             } else if (quality) {
-                args.push('-f', `${quality}+bestaudio/best`);
+                args.push('-f', `${quality}+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best`);
                 args.push('--merge-output-format', 'mp4');
             } else {
-                args.push('-f', 'bestvideo*+bestaudio/best');
+                args.push('-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best');
                 args.push('--merge-output-format', 'mp4');
             }
         }
@@ -295,15 +299,21 @@ app.post('/api/download', async (req, res) => {
             const filePath = path.join(downloadsDir, downloadedFile);
             const stat = fs.statSync(filePath);
             
-            // Stream file directly instead of loading into memory
+            // Ensure the filename ends with .mp4 for video downloads
+            let safeFilename = downloadedFile;
+            if (format !== 'audio' && !safeFilename.toLowerCase().endsWith('.mp4')) {
+                safeFilename = safeFilename.replace(/\.[^.]+$/, '.mp4');
+            }
+            
             res.setHeader('Content-Length', stat.size);
-            res.setHeader('Content-Disposition', `attachment; filename="${downloadedFile}"`);
+            res.setHeader('Content-Type', format === 'audio' ? 'audio/mpeg' : 'video/mp4');
+            res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
             
             const readStream = fs.createReadStream(filePath);
             readStream.pipe(res);
             
-            readStream.on('end', () => { fs.unlinkSync(filePath); });
-            readStream.on('error', () => { fs.unlinkSync(filePath); });
+            readStream.on('end', () => { try { fs.unlinkSync(filePath); } catch(e) {} });
+            readStream.on('error', () => { try { fs.unlinkSync(filePath); } catch(e) {} });
         } else {
             res.status(500).json({ error: 'Download failed' });
         }
@@ -322,6 +332,6 @@ app.get('/{*path}', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
-    console.log(`Compression: enabled | Cache: 7d static | Concurrent fragments: 5`);
+    console.log(`Compression: enabled | Cache: 7d static | Concurrent fragments: 10 | Buffer: 64K`);
     console.log('Make sure yt-dlp is installed: https://github.com/yt-dlp/yt-dlp');
 });
