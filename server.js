@@ -305,6 +305,18 @@ app.post('/api/download', async (req, res) => {
                 safeFilename = safeFilename.replace(/\.[^.]+$/, '.mp4');
             }
             
+            // Sanitize filename: remove characters invalid in HTTP headers
+            safeFilename = safeFilename
+                .replace(/[^\x20-\x7E]/g, '')  // strip non-printable / non-ASCII
+                .replace(/"/g, "'")             // replace double quotes
+                .replace(/[\r\n]/g, '')         // strip newlines
+                .trim();
+            
+            // Fallback if stripping left nothing useful
+            if (!safeFilename || safeFilename.length < 4) {
+                safeFilename = format === 'audio' ? 'audio.mp3' : 'video.mp4';
+            }
+            
             res.setHeader('Content-Length', stat.size);
             res.setHeader('Content-Type', format === 'audio' ? 'audio/mpeg' : 'video/mp4');
             res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
