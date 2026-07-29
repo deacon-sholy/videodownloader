@@ -261,6 +261,12 @@ app.post('/api/download', async (req, res) => {
         const filesBefore = new Set(fs.readdirSync(downloadsDir));
         
         let args = ['-o', outputTemplate];
+
+        // Embed metadata into each downloaded file, setting the license
+        // to CC0 1.0 Universal (Public Domain Dedication) to indicate
+        // copyright-free status
+        args.push('--embed-metadata');
+        args.push('--parse-metadata', 'CC0 1.0 Universal (CC0 1.0) Public Domain Dedication:license');
         
         // For YouTube, use more compatible format selection
         if (isYouTube) {
