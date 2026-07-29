@@ -119,6 +119,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // ==================== ENTER KEY TRIGGERS DOWNLOAD ====================
+    videoUrlInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            downloadBtn.click();
+        }
+    });
+
     // ==================== FETCH VIDEO INFO ====================
     downloadBtn.addEventListener('click', async function() {
         const url = videoUrlInput.value.trim();
