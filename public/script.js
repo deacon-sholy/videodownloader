@@ -306,6 +306,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.body.removeChild(a);
 
             showStatus('Download completed!', 'success');
+            resetToHomepage();
             // Delay revoke to ensure browser has started saving
             setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10000);
         } catch (error) {
@@ -317,6 +318,17 @@ document.addEventListener('DOMContentLoaded', function() {
         } finally {
             cleanupRequest();
         }
+    }
+
+    // ==================== RESET TO HOMEPAGE ====================
+    function resetToHomepage() {
+        setTimeout(() => {
+            videoUrlInput.value = '';
+            currentVideoUrl = '';
+            videoInfo.classList.add('hidden');
+            qualitySelector.classList.add('hidden');
+            status.classList.add('hidden');
+        }, 2000);
     }
 
     // ==================== UTILITY FUNCTIONS ====================

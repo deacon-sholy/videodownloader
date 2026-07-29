@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -262,11 +262,12 @@ app.post('/api/download', async (req, res) => {
         
         let args = ['-o', outputTemplate];
 
-        // Embed metadata into each downloaded file, setting the license
-        // to CC0 1.0 Universal (Public Domain Dedication) to indicate
-        // copyright-free status
-        args.push('--embed-metadata');
-        args.push('--parse-metadata', 'CC0 1.0 Universal (CC0 1.0) Public Domain Dedication:license');
+        // Embed CC0 license metadata if ffmpeg is available
+        const ffmpegCheck = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore', timeout: 5000 });
+        if (ffmpegCheck.status === 0) {
+            args.push('--embed-metadata');
+            args.push('--parse-metadata', 'CC0 1.0 Universal (CC0 1.0) Public Domain Dedication:license');
+        }
         
         // For YouTube, use more compatible format selection
         if (isYouTube) {
